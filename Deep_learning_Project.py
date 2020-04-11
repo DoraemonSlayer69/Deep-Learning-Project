@@ -10,6 +10,9 @@ from keras import models
 from keras import layers
 from keras import regularizers
 from keras import optimizers
+from keras.preprocessing import image
+import numpy as np
+
 
 base_dir = 'D:\Personal\Deep Learning Project\chest_xray'
 
@@ -20,6 +23,9 @@ original_train_normal = os.path.join(original_train,"NORMAL")
 original_train_pneumonia = os.path.join(original_train,"PNEUMONIA")
 original_test_normal = os.path.join(original_test,'NORMAL')
 original_test_pneumonia = os.path.join(original_test,'PNEUMONIA')
+train_dir = os.path.join(custom_dir,'train')
+test_dir = os.path.join(custom_dir,'test')
+val_dir = os.path.join(custom_dir,'val')
 #Creating Train and Test and val directories
 if os.path.exists(custom_dir)==False:
     os.mkdir(custom_dir)
@@ -96,12 +102,9 @@ for i in range(0,len(test_filenames_pneumonia)):
     
 train_datagen = ImageDataGenerator(
         rescale=1./255,
-        rotation_range=40,
-        width_shift_range=0.2,
-        height_shift_range=0.2,
-        shear_range=0.2,
-        zoom_range=0.2,
-        horizontal_flip=True,
+        brightness_range=[0,2],
+        zca_whitening=True,
+        zca_epsilon=2.0,
         fill_mode='nearest')
 
 
@@ -121,6 +124,36 @@ val_gen = test_datagen.flow_from_directory(
         batch_size=20,
         class_mode='binary')
 
+import matplotlib.pyplot as plt
+#loading image 
+img_name = "D:/Personal/Deep Learning Project/Chest_Xrays/train/NORMAL/IM-0133-0001.jpeg"
+print(img_name)
+img = image.load_img(img_name,target_size=(224,224))
+img_tensor = image.img_to_array(img)
+
+
+aug_img = (1.5 * img_tensor) + 2
+aug_img /=255.0
+img_tensor /= 255.0
+
+k=0
+for i in train_gen:
+    if k == 10:
+        break
+    else:
+        img = i[0]
+        #img = img/255.0
+        plt.imshow(img[0])
+        k+=1
+        print(k)
+'''
+aug_img -= np.mean(aug_img)
+aug_img /= np.std(aug_img)
+'''
+#img_tensor = np.expand_dims(img_tensor, axis=0)
+print(img_tensor.shape)
+plt.imshow(img_tensor)
+plt.imshow(aug_img)
 
 #Desiging the network
 network = models.Sequential()
@@ -143,4 +176,4 @@ network.summary()
 
 network.compile(optimizer=optimizers.Adam(lr=1e-4),loss='binary_crossentropy',metrics=['acc'])
 
-history = network.fit_generator(train_gen,steps_per_epoch=100,epochs=10,validation_data=val_gen,validation_steps=100)
+history = network.fit_generator(train_gen,steps_per_epoch=100,epochs=40,validation_data=val_gen,validation_steps=100)
