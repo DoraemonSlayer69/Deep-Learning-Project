@@ -12,6 +12,24 @@ from keras import regularizers
 from keras import optimizers
 from keras.preprocessing import image
 import numpy as np
+from keras import backend as K
+
+def recall_m(y_true, y_pred):
+    true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
+    possible_positives = K.sum(K.round(K.clip(y_true, 0, 1)))
+    recall = true_positives / (possible_positives + K.epsilon())
+    return recall
+
+def precision_m(y_true, y_pred):
+    true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
+    predicted_positives = K.sum(K.round(K.clip(y_pred, 0, 1)))
+    precision = true_positives / (predicted_positives + K.epsilon())
+    return precision
+
+def f1_m(y_true, y_pred):
+    precision = precision_m(y_true, y_pred)
+    recall = recall_m(y_true, y_pred)
+    return 2*((precision*recall)/(precision+recall+K.epsilon()))
 
 
 base_dir = 'D:\Personal\Deep Learning Project\chest_xray'
@@ -26,6 +44,10 @@ original_test_pneumonia = os.path.join(original_test,'PNEUMONIA')
 train_dir = os.path.join(custom_dir,'train')
 test_dir = os.path.join(custom_dir,'test')
 val_dir = os.path.join(custom_dir,'val')
+train_dir_normal = os.path.join(train_dir,'NORMAL')
+train_dir_pneumonia = os.path.join(train_dir,'PNEUMONIA')
+val_dir_normal = os.path.join(val_dir,'NORMAL')
+val_dir_pneumonia = os.path.join(val_dir,'PNEUMONIA')
 #Creating Train and Test and val directories
 if os.path.exists(custom_dir)==False:
     os.mkdir(custom_dir)
@@ -103,9 +125,13 @@ for i in range(0,len(test_filenames_pneumonia)):
 train_datagen = ImageDataGenerator(
         rescale=1./255,
         brightness_range=[0,2],
-        zca_whitening=True,
         zca_epsilon=2.0,
-        fill_mode='nearest')
+        fill_mode='nearest',
+        zca_whitening=False,
+        zoom_range=0.2,
+        rotation_range=40)
+
+
 
 
 test_datagen = ImageDataGenerator(
@@ -120,6 +146,13 @@ train_gen = train_datagen.flow_from_directory(
 
 val_gen = test_datagen.flow_from_directory(
         val_dir,
+        target_size=(224,224),
+        batch_size=20,
+        class_mode='binary')
+
+
+test_gen = test_datagen.flow_from_directory(
+        test_dir,
         target_size=(224,224),
         batch_size=20,
         class_mode='binary')
@@ -146,10 +179,7 @@ for i in train_gen:
         plt.imshow(img[0])
         k+=1
         print(k)
-'''
-aug_img -= np.mean(aug_img)
-aug_img /= np.std(aug_img)
-'''
+
 #img_tensor = np.expand_dims(img_tensor, axis=0)
 print(img_tensor.shape)
 plt.imshow(img_tensor)
@@ -177,3 +207,31 @@ network.summary()
 network.compile(optimizer=optimizers.Adam(lr=1e-4),loss='binary_crossentropy',metrics=['acc'])
 
 history = network.fit_generator(train_gen,steps_per_epoch=100,epochs=40,validation_data=val_gen,validation_steps=100)
+
+def PlotGraph(history):
+    import matplotlib.pyplot as plt
+    acc = history.history['acc']
+    val_acc = history.history['val_acc']
+    loss = history.history['loss']
+    val_loss = history.history['val_loss']
+    epochs = range(1,len(acc) + 1)
+
+#Validation vs Training in accuracy
+    plt.plot(epochs,acc,'bo',label='training accuracy')
+    plt.plot(epochs,val_acc,'b',label='Validation accuracy')
+    plt.xlabel('Epochs')
+    plt.ylabel('Accuracy')
+    plt.legend()
+    plt.figure()
+
+    plt.plot(epochs,loss,'bo',label='training loss')
+    plt.plot(epochs,val_loss,'b',label='Validation loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.figure()
+    plt.show()
+
+PlotGraph(history)
+
+
